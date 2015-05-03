@@ -27,9 +27,9 @@ This was ported for the version found on www.haskell.org/hood.
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Exports}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -38,13 +38,13 @@ module Debug.Hood.Observe
    -- * The main Hood API
 
 
-     observe	   -- (Observable a) => String -> a -> a
+    observe        -- (Observable a) => String -> a -> a
   , Observer(..)   -- contains a 'forall' typed observe (if supported).
   , Observing      -- a -> a
   , Observable(..) -- Class
-  , runO	   -- IO a -> IO ()
-  , printO	   -- a -> IO ()
-  , putStrO	   -- String -> IO ()
+  , runO           -- IO a -> IO ()
+  , printO         -- a -> IO ()
+  , putStrO        -- String -> IO ()
 
    -- * For advanced users, that want to render their own datatypes.
   , (<<)           -- (Observable a) => ObserverM (a -> b) -> a -> ObserverM b
@@ -55,16 +55,16 @@ module Debug.Hood.Observe
 
   -- * For users that want to write there own render drivers.
 
-  , debugO	   -- IO a -> IO [CDS]
+  , debugO         -- IO a -> IO [CDS]
   , CDS(..)
   ) where
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Imports and infixing}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -90,9 +90,9 @@ import Control.Exception ( Exception, throw )
 import qualified Control.Exception as Exception
 {-
  ( catch
-		, Exception(..)
-		, throw
-		) as Exception
+                , Exception(..)
+                , throw
+                ) as Exception
 -}
 import Data.Dynamic ( Dynamic )
 \end{code}
@@ -103,9 +103,9 @@ infixl 9 <<
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{External start functions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Run the observe ridden code.
@@ -115,13 +115,13 @@ Run the observe ridden code.
 debugO :: IO a -> IO [CDS]
 debugO program =
      do { initUniq
-	; startEventStream
+        ; startEventStream
         ; let errorMsg e = "[Escaping Exception in Code : " ++ show e ++ "]"
-	; ourCatchAllIO (do { program ; return () })
-			(hPutStrLn stderr . errorMsg)
+        ; ourCatchAllIO (do { program ; return () })
+                        (hPutStrLn stderr . errorMsg)
         ; events <- endEventStream
-	; return (eventsToCDS events)
-	}
+        ; return (eventsToCDS events)
+        }
 
 -- | print a value, with debugging
 printO :: (Show a) => a -> IO ()
@@ -170,9 +170,9 @@ runO program =
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Simulations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Here we provide stubs for the functionally that is not supported
@@ -190,22 +190,22 @@ handleExc context exc = return (send "throw" (return throw << exc) context)
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Instances}
-%*									*
+%*                                                                      *
 %************************************************************************
 
  The Haskell Base types
 
 \begin{code}
-instance Observable Int 	where { observer = observeBase }
-instance Observable Bool 	where { observer = observeBase }
-instance Observable Integer 	where { observer = observeBase }
-instance Observable Float 	where { observer = observeBase }
-instance Observable Double	where { observer = observeBase }
-instance Observable Char 	where { observer = observeBase }
+instance Observable Int         where { observer = observeBase }
+instance Observable Bool        where { observer = observeBase }
+instance Observable Integer     where { observer = observeBase }
+instance Observable Float       where { observer = observeBase }
+instance Observable Double      where { observer = observeBase }
+instance Observable Char        where { observer = observeBase }
 
-instance Observable ()		where { observer = observeOpaque "()" }
+instance Observable ()          where { observer = observeOpaque "()" }
 
 -- utilities for base types.
 -- The strictness (by using seq) is the same
@@ -229,11 +229,11 @@ instance (Observable a,Observable b,Observable c) => Observable (a,b,c) where
   observer (a,b,c) = send "," (return (,,) << a << b << c)
 
 instance (Observable a,Observable b,Observable c,Observable d)
-	  => Observable (a,b,c,d) where
+         => Observable (a,b,c,d) where
   observer (a,b,c,d) = send "," (return (,,,) << a << b << c << d)
 
 instance (Observable a,Observable b,Observable c,Observable d,Observable e)
-	 => Observable (a,b,c,d,e) where
+         => Observable (a,b,c,d,e) where
   observer (a,b,c,d,e) = send "," (return (,,,,) << a << b << c << d << e)
 
 instance (Observable a) => Observable [a] where
@@ -254,8 +254,8 @@ Arrays.
 \begin{code}
 instance (Ix a,Observable a,Observable b) => Observable (Array.Array a b) where
   observer arr = send "array" (return Array.array << Array.bounds arr
-					          << Array.assocs arr
-			      )
+                                                  << Array.assocs arr
+                              )
 \end{code}
 
 IO monad.
@@ -263,8 +263,8 @@ IO monad.
 \begin{code}
 instance (Observable a) => Observable (IO a) where
   observer fn cxt =
-	do res <- fn
-	   send "<IO>" (return return << res) cxt
+        do res <- fn
+           send "<IO>" (return return << res) cxt
 \end{code}
 
 
@@ -273,8 +273,8 @@ Functions.
 \begin{code}
 instance (Observable a,Observable b) => Observable (a -> b) where
   observer fn cxt arg = sendObserveFnPacket (
-	do arg <- thunk arg
-	   thunk (fn arg)) cxt
+        do arg <- thunk arg
+           thunk (fn arg)) cxt
 
   observers = defaultFnObservers
 \end{code}
@@ -293,26 +293,26 @@ instance Observable Dynamic where { observer = observeOpaque "<Dynamic>" }
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Classes and Data Definitions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 class Observable a where
-	{-
-	 - This reveals the name of a specific constructor.
-	 - and gets ready to explain the sub-components.
+        {-
+         - This reveals the name of a specific constructor.
+         - and gets ready to explain the sub-components.
          -
          - We put the context second so we can do eta-reduction
-	 - with some of our definitions.
-	 -}
-	observer  :: a -> Parent -> a
-	{-
+         - with some of our definitions.
+         -}
+        observer  :: a -> Parent -> a
+        {-
          - This used used to group several observer instances together.
-	 -}
-	observers :: String -> (Observer -> a) -> a
-	observers label arg = defaultObservers label arg
+         -}
+        observers :: String -> (Observer -> a) -> a
+        observers label arg = defaultObservers label arg
 
 type Observing a = a -> a
 \end{code}
@@ -323,47 +323,47 @@ newtype Observer = O (forall a . (Observable a) => String -> a -> a)
 defaultObservers :: (Observable a) => String -> (Observer -> a) -> a
 defaultObservers label fn = unsafeWithUniq $ \ node ->
      do { sendEvent node (Parent 0 0) (Observe label)
-	; let observe' sublabel a
-	       = unsafeWithUniq $ \ subnode ->
-		 do { sendEvent subnode (Parent node 0)
-		                        (Observe sublabel)
-		    ; return (observer_ a (Parent
-			{ observeParent = subnode
-			, observePort   = 0
-		        }))
-		    }
+        ; let observe' sublabel a
+               = unsafeWithUniq $ \ subnode ->
+                 do { sendEvent subnode (Parent node 0)
+                                        (Observe sublabel)
+                    ; return (observer_ a (Parent
+                        { observeParent = subnode
+                        , observePort   = 0
+                        }))
+                    }
         ; return (observer_ (fn (O observe'))
-		       (Parent
-			{ observeParent = node
-			, observePort   = 0
-		        }))
-	}
+                       (Parent
+                        { observeParent = node
+                        , observePort   = 0
+                        }))
+        }
 defaultFnObservers :: (Observable a, Observable b)
-		      => String -> (Observer -> a -> b) -> a -> b
+                      => String -> (Observer -> a -> b) -> a -> b
 defaultFnObservers label fn arg = unsafeWithUniq $ \ node ->
      do { sendEvent node (Parent 0 0) (Observe label)
-	; let observe' sublabel a
-	       = unsafeWithUniq $ \ subnode ->
-		 do { sendEvent subnode (Parent node 0)
-		                        (Observe sublabel)
-		    ; return (observer_ a (Parent
-			{ observeParent = subnode
-			, observePort   = 0
-		        }))
-		    }
+        ; let observe' sublabel a
+               = unsafeWithUniq $ \ subnode ->
+                 do { sendEvent subnode (Parent node 0)
+                                        (Observe sublabel)
+                    ; return (observer_ a (Parent
+                        { observeParent = subnode
+                        , observePort   = 0
+                        }))
+                    }
         ; return (observer_ (fn (O observe'))
-		       (Parent
-			{ observeParent = node
-			, observePort   = 0
-		        }) arg)
-	}
+                       (Parent
+                        { observeParent = node
+                        , observePort   = 0
+                        }) arg)
+        }
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The ObserveM Monad}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 The Observer monad, a simple state monad,
@@ -380,19 +380,19 @@ instance Applicative ObserverM where
     (<*>) = ap
 
 instance Monad ObserverM where
-	return a = ObserverM (\ c i -> (a,i))
-	fn >>= k = ObserverM (\ c i ->
-		case runMO fn c i of
-		  (r,i2) -> runMO (k r) c i2
-		)
+        return a = ObserverM (\ c i -> (a,i))
+        fn >>= k = ObserverM (\ c i ->
+                case runMO fn c i of
+                  (r,i2) -> runMO (k r) c i2
+                )
 
 thunk :: (Observable a) => a -> ObserverM a
 thunk a = ObserverM $ \ parent port ->
-		( observer_ a (Parent
-				{ observeParent = parent
-				, observePort   = port
-				})
-		, port+1 )
+                ( observer_ a (Parent
+                                { observeParent = parent
+                                , observePort   = port
+                                })
+                , port+1 )
 
 (<<) :: (Observable a) => ObserverM (a -> b) -> a -> ObserverM b
 fn << a = do { fn' <- fn ; a' <- thunk a ; return (fn' a') }
@@ -400,9 +400,9 @@ fn << a = do { fn' <- fn ; a' <- thunk a ; return (fn' a') }
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{observe and friends}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Our principle function and class
@@ -436,9 +436,9 @@ observer_ a context = sendEnterPacket a context
 
 \begin{code}
 data Parent = Parent
-	{ observeParent :: !Int	-- my parent
-	, observePort   :: !Int	-- my branch number
-	} deriving Show
+        { observeParent :: !Int -- my parent
+        , observePort   :: !Int -- my branch number
+        } deriving Show
 root = Parent 0 0
 \end{code}
 
@@ -449,34 +449,34 @@ The functions that output the data. All are dirty.
 unsafeWithUniq :: (Int -> IO a) -> a
 unsafeWithUniq fn
   = unsafePerformIO $ do { node <- getUniq
-		         ; fn node
-		         }
+                         ; fn node
+                         }
 \end{code}
 
 \begin{code}
 generateContext :: (Observable a) => String -> a -> a
 generateContext label orig = unsafeWithUniq $ \ node ->
      do { sendEvent node (Parent 0 0) (Observe label)
-	; return (observer_ orig (Parent
-			{ observeParent = node
-			, observePort   = 0
-		        })
-		  )
-	}
+        ; return (observer_ orig (Parent
+                        { observeParent = node
+                        , observePort   = 0
+                        })
+                  )
+        }
 
 send :: String -> ObserverM a -> Parent -> a
 send consLabel fn context = unsafeWithUniq $ \ node ->
      do { let (r,portCount) = runMO fn node 0
-	; sendEvent node context (Cons portCount consLabel)
-	; return r
-	}
+        ; sendEvent node context (Cons portCount consLabel)
+        ; return r
+        }
 
 sendEnterPacket :: (Observable a) => a -> Parent -> a
 sendEnterPacket r context = unsafeWithUniq $ \ node ->
-     do	{ sendEvent node context Enter
-	; ourCatchAllIO (evaluate (observer r context))
-	                (handleExc context)
-	}
+     do { sendEvent node context Enter
+        ; ourCatchAllIO (evaluate (observer r context))
+                        (handleExc context)
+        }
 
 evaluate :: a -> IO a
 evaluate a = a `seq` return a
@@ -484,56 +484,56 @@ evaluate a = a `seq` return a
 
 sendObserveFnPacket :: ObserverM a -> Parent -> a
 sendObserveFnPacket fn context = unsafeWithUniq $ \ node ->
-     do	{ let (r,_) = runMO fn node 0
-	; sendEvent node context Fun
-	; return r
-	}
+     do { let (r,_) = runMO fn node 0
+        ; sendEvent node context Fun
+        ; return r
+        }
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Event stream}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Trival output functions
 
 \begin{code}
 data Event = Event
-		{ portId     :: !Int
-		, parent     :: !Parent
-		, change     :: !Change
-		}
-	deriving Show
+                { portId     :: !Int
+                , parent     :: !Parent
+                , change     :: !Change
+                }
+        deriving Show
 
 data Change
-	= Observe 	!String
-	| Cons    !Int 	!String
-	| Enter
-	| Fun
-	deriving Show
+        = Observe       !String
+        | Cons    !Int  !String
+        | Enter
+        | Fun
+        deriving Show
 
 startEventStream :: IO ()
 startEventStream = writeIORef events []
 
 endEventStream :: IO [Event]
 endEventStream =
-	do { es <- readIORef events
-	   ; writeIORef events badEvents
-	   ; return es
-	   }
+        do { es <- readIORef events
+           ; writeIORef events badEvents
+           ; return es
+           }
 
 sendEvent :: Int -> Parent -> Change -> IO ()
 sendEvent nodeId parent change =
-	do { nodeId `seq` parent `seq` return ()
-	   ; change `seq` return ()
-	   ; takeMVar sendSem
-	   ; es <- readIORef events
-	   ; let event = Event nodeId parent change
-	   ; writeIORef events (event `seq` (event : es))
-	   ; putMVar sendSem ()
-	   }
+        do { nodeId `seq` parent `seq` return ()
+           ; change `seq` return ()
+           ; takeMVar sendSem
+           ; es <- readIORef events
+           ; let event = Event nodeId parent change
+           ; writeIORef events (event `seq` (event : es))
+           ; putMVar sendSem ()
+           }
 
 -- local
 events :: IORef [Event]
@@ -551,9 +551,9 @@ sendSem = unsafePerformIO $ newMVar ()
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{unique name supply code}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Use the single threaded version
@@ -565,11 +565,11 @@ initUniq = writeIORef uniq 1
 getUniq :: IO Int
 getUniq
     = do { takeMVar uniqSem
-	 ; n <- readIORef uniq
-	 ; writeIORef uniq $! (n + 1)
-	 ; putMVar uniqSem ()
-	 ; return n
-	 }
+         ; n <- readIORef uniq
+         ; writeIORef uniq $! (n + 1)
+         ; putMVar uniqSem ()
+         ; return n
+         }
 
 peepUniq :: IO Int
 peepUniq = readIORef uniq
@@ -587,39 +587,39 @@ uniqSem = unsafePerformIO $ newMVar ()
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Global, initualizers, etc}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 openObserveGlobal :: IO ()
 openObserveGlobal =
      do { initUniq
-	; startEventStream
-	}
+        ; startEventStream
+        }
 
 closeObserveGlobal :: IO [Event]
 closeObserveGlobal =
      do { evs <- endEventStream
         ; putStrLn ""
-	; return evs
-	}
+        ; return evs
+        }
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The CDS and converting functions}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 data CDS = CDSNamed String         CDSSet
-	 | CDSCons Int String     [CDSSet]
-	 | CDSFun  Int             CDSSet CDSSet
-	 | CDSEntered Int
-	deriving (Show,Eq,Ord)
+         | CDSCons Int String     [CDSSet]
+         | CDSFun  Int             CDSSet CDSSet
+         | CDSEntered Int
+        deriving (Show,Eq,Ord)
 
 type CDSSet = [CDS]
 
@@ -633,54 +633,54 @@ eventsToCDS pairs = getChild 0 0
 
      mid_arr :: Array Int [(Int,CDS)]
      mid_arr = accumArray (flip (:)) [] bnds
-		[ (pnode,(pport,res node))
-	        | (Event node (Parent pnode pport) _) <- pairs
-		]
+                [ (pnode,(pport,res node))
+                | (Event node (Parent pnode pport) _) <- pairs
+                ]
 
-     out_arr = array bnds	-- never uses 0 index
-	        [ (node,getNode'' node change)
-	 	| (Event node _ change) <- pairs
-		]
+     out_arr = array bnds       -- never uses 0 index
+                [ (node,getNode'' node change)
+                | (Event node _ change) <- pairs
+                ]
 
      getNode'' ::  Int -> Change -> CDS
      getNode'' node change =
        case change of
-	(Observe str) -> CDSNamed str (getChild node 0)
-	(Enter)       -> CDSEntered node
-	(Fun)         -> CDSFun node (getChild node 0) (getChild node 1)
-	(Cons portc cons)
-		      -> CDSCons node cons
-				[ getChild node n | n <- [0..(portc-1)]]
+        (Observe str) -> CDSNamed str (getChild node 0)
+        (Enter)       -> CDSEntered node
+        (Fun)         -> CDSFun node (getChild node 0) (getChild node 1)
+        (Cons portc cons)
+                      -> CDSCons node cons
+                                [ getChild node n | n <- [0..(portc-1)]]
 
      getChild :: Int -> Int -> CDSSet
      getChild pnode pport =
-	[ content
+        [ content
         | (pport',content) <- (!) mid_arr pnode
-	, pport == pport'
-	]
+        , pport == pport'
+        ]
 
 render  :: Int -> Bool -> CDS -> DOC
 render prec par (CDSCons _ ":" [cds1,cds2]) =
-	if (par && not needParen)
-	then doc -- dont use paren (..) because we dont want a grp here!
-	else paren needParen doc
+        if (par && not needParen)
+        then doc -- dont use paren (..) because we dont want a grp here!
+        else paren needParen doc
    where
-	doc = grp (brk <> renderSet' 5 False cds1 <> text " : ") <>
-	      renderSet' 4 True cds2
-	needParen = prec > 4
+        doc = grp (brk <> renderSet' 5 False cds1 <> text " : ") <>
+              renderSet' 4 True cds2
+        needParen = prec > 4
 render prec par (CDSCons _ "," cdss) | length cdss > 0 =
-	nest 2 (text "(" <> foldl1 (\ a b -> a <> text ", " <> b)
-			    (map renderSet cdss) <>
-		text ")")
+        nest 2 (text "(" <> foldl1 (\ a b -> a <> text ", " <> b)
+                            (map renderSet cdss) <>
+                text ")")
 render prec par (CDSCons _ name cdss) =
-	paren (length cdss > 0 && prec /= 0)
-	      (nest 2
-	         (text name <> foldr (<>) nil
-			 	[ sep <> renderSet' 10 False cds
-			 	| cds <- cdss
-			 	]
-		 )
-	      )
+        paren (length cdss > 0 && prec /= 0)
+              (nest 2
+                 (text name <> foldr (<>) nil
+                                [ sep <> renderSet' 10 False cds
+                                | cds <- cdss
+                                ]
+                 )
+              )
 
 {- renderSet handles the various styles of CDSSet.
  -}
@@ -691,28 +691,28 @@ renderSet = renderSet' 0 False
 renderSet' :: Int -> Bool -> CDSSet -> DOC
 renderSet' _ _      [] = text "_"
 renderSet' prec par [cons@(CDSCons {})]    = render prec par cons
-renderSet' prec par cdss		   =
-	nest 0 (text "{ " <> foldl1 (\ a b -> a <> line <>
-				    text ", " <> b)
-				    (map renderFn pairs) <>
-	        line <> text "}")
+renderSet' prec par cdss                   =
+        nest 0 (text "{ " <> foldl1 (\ a b -> a <> line <>
+                                    text ", " <> b)
+                                    (map renderFn pairs) <>
+                line <> text "}")
 
    where
-	pairs = nub (sort (findFn cdss))
-	-- local nub for sorted lists
-	nub []                  = []
-	nub (a:a':as) | a == a' = nub (a' : as)
+        pairs = nub (sort (findFn cdss))
+        -- local nub for sorted lists
+        nub []                  = []
+        nub (a:a':as) | a == a' = nub (a' : as)
         nub (a:as)              = a : nub as
 
 renderFn :: ([CDSSet],CDSSet) -> DOC
 renderFn (args,res)
-	= grp  (nest 3
-		(text "\\ " <>
-		 foldr (\ a b -> nest 0 (renderSet' 10 False a) <> sp <> b)
-		       nil
-		       args <> sep <>
-		 text "-> " <> renderSet' 0 False res
-		)
+        = grp  (nest 3
+                (text "\\ " <>
+                 foldr (\ a b -> nest 0 (renderSet' 10 False a) <> sp <> b)
+                       nil
+                       args <> sep <>
+                 text "-> " <> renderSet' 0 False res
+                )
                )
 
 findFn :: CDSSet -> [([CDSSet],CDSSet)]
@@ -729,9 +729,9 @@ renderTops tops = line <> foldr (<>) nil (map renderTop tops)
 
 renderTop :: Output -> DOC
 renderTop (OutLabel str set extras) =
-	nest 2 (text ("-- " ++ str) <> line <>
-		renderSet set
-		<> renderTops extras) <> line
+        nest 2 (text ("-- " ++ str) <> line <>
+                renderSet set
+                <> renderTops extras) <> line
 
 rmEntry :: CDS -> CDS
 rmEntry (CDSNamed str set)   = CDSNamed str (rmEntrySet set)
@@ -741,38 +741,38 @@ rmEntry (CDSEntered i)       = error "found bad CDSEntered"
 
 rmEntrySet = map rmEntry . filter noEntered
   where
-	noEntered (CDSEntered _) = False
-	noEntered _              = True
+        noEntered (CDSEntered _) = False
+        noEntered _              = True
 
 simplifyCDS :: CDS -> CDS
 simplifyCDS (CDSNamed str set) = CDSNamed str (simplifyCDSSet set)
 simplifyCDS (CDSCons _ "throw"
-		  [[CDSCons _ "ErrorCall" set]]
-	    ) = simplifyCDS (CDSCons 0 "error" set)
+                  [[CDSCons _ "ErrorCall" set]]
+            ) = simplifyCDS (CDSCons 0 "error" set)
 simplifyCDS cons@(CDSCons i str sets) =
-	case spotString [cons] of
-	  Just str | not (null str) -> CDSCons 0 (show str) []
-	  _ -> CDSCons 0 str (map simplifyCDSSet sets)
+        case spotString [cons] of
+          Just str | not (null str) -> CDSCons 0 (show str) []
+          _ -> CDSCons 0 str (map simplifyCDSSet sets)
 
 simplifyCDS (CDSFun i a b) = CDSFun 0 (simplifyCDSSet a) (simplifyCDSSet b)
-	-- replace with
-	-- 	CDSCons i "->" [simplifyCDSSet a,simplifyCDSSet b]
-	-- for turning off the function stuff.
+        -- replace with
+        --      CDSCons i "->" [simplifyCDSSet a,simplifyCDSSet b]
+        -- for turning off the function stuff.
 
 simplifyCDSSet = map simplifyCDS
 
 spotString :: CDSSet -> Maybe String
 spotString [CDSCons _ ":"
-		[[CDSCons _ str []]
-		,rest
-		]
-	   ]
-	= do { ch <- case reads str of
-	               [(ch,"")] -> return ch
+                [[CDSCons _ str []]
+                ,rest
+                ]
+           ]
+        = do { ch <- case reads str of
+                       [(ch,"")] -> return ch
                        _ -> Nothing
-	     ; more <- spotString rest
-	     ; return (ch : more)
-	     }
+             ; more <- spotString rest
+             ; return (ch : more)
+             }
 spotString [CDSCons _ "[]" []] = return []
 spotString other = Nothing
 
@@ -785,7 +785,7 @@ sp = text " "
 
 data Output = OutLabel String CDSSet [Output]
             | OutData  CDS
-	      deriving (Eq,Ord)
+              deriving (Eq,Ord)
 
 
 commonOutput :: [Output] -> [Output]
@@ -797,7 +797,7 @@ cdssToOutput :: CDSSet -> [Output]
 cdssToOutput =  map cdsToOutput
 
 cdsToOutput (CDSNamed name cdsset)
-	    = OutLabel name res1 res2
+            = OutLabel name res1 res2
   where
       res1 = [ cdss | (OutData cdss) <- res ]
       res2 = [ out  | out@(OutLabel {}) <- res ]
@@ -809,95 +809,95 @@ cdsToOutput    fn@(CDSFun {}) = OutData fn
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{A Pretty Printer}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 This pretty printer is based on Wadler's pretty printer.
 
 \begin{code}
-data DOC		= NIL			-- nil
-			| DOC :<> DOC		-- beside
-			| NEST Int DOC
-			| TEXT String
-			| LINE			-- always "\n"
-			| SEP			-- " " or "\n"
-			| BREAK			-- ""  or "\n"
-			| DOC :<|> DOC		-- choose one
-			deriving (Eq,Show)
-data Doc		= Nil
-			| Text Int String Doc
-			| Line Int Int Doc
-			deriving (Show,Eq)
+data DOC                = NIL                   -- nil
+                        | DOC :<> DOC           -- beside
+                        | NEST Int DOC
+                        | TEXT String
+                        | LINE                  -- always "\n"
+                        | SEP                   -- " " or "\n"
+                        | BREAK                 -- ""  or "\n"
+                        | DOC :<|> DOC          -- choose one
+                        deriving (Eq,Show)
+data Doc                = Nil
+                        | Text Int String Doc
+                        | Line Int Int Doc
+                        deriving (Show,Eq)
 
 
-mkText			:: String -> Doc -> Doc
-mkText s d		= Text (toplen d + length s) s d
+mkText                  :: String -> Doc -> Doc
+mkText s d              = Text (toplen d + length s) s d
 
-mkLine			:: Int -> Doc -> Doc
-mkLine i d		= Line (toplen d + i) i d
+mkLine                  :: Int -> Doc -> Doc
+mkLine i d              = Line (toplen d + i) i d
 
-toplen			:: Doc -> Int
-toplen Nil		= 0
-toplen (Text w s x)	= w
-toplen (Line w s x)	= 0
+toplen                  :: Doc -> Int
+toplen Nil              = 0
+toplen (Text w s x)     = w
+toplen (Line w s x)     = 0
 
-nil			= NIL
-x <> y			= x :<> y
-nest i x		= NEST i x
-text s 			= TEXT s
-line			= LINE
-sep			= SEP
-brk			= BREAK
+nil                     = NIL
+x <> y                  = x :<> y
+nest i x                = NEST i x
+text s                  = TEXT s
+line                    = LINE
+sep                     = SEP
+brk                     = BREAK
 
-fold x			= grp (brk <> x)
+fold x                  = grp (brk <> x)
 
-grp 			:: DOC -> DOC
-grp x			=
-	case flatten x of
-	  Just x' -> x' :<|> x
-	  Nothing -> x
+grp                     :: DOC -> DOC
+grp x                   =
+        case flatten x of
+          Just x' -> x' :<|> x
+          Nothing -> x
 
-flatten 		:: DOC -> Maybe DOC
-flatten	NIL		= return NIL
-flatten (x :<> y)	=
-	do x' <- flatten x
-	   y' <- flatten y
-	   return (x' :<> y')
-flatten (NEST i x)	=
-	do x' <- flatten x
-	   return (NEST i x')
-flatten (TEXT s)	= return (TEXT s)
-flatten LINE		= Nothing		-- abort
-flatten SEP		= return (TEXT " ")	-- SEP is space
-flatten BREAK		= return NIL		-- BREAK is nil
-flatten (x :<|> y)	= flatten x
+flatten                 :: DOC -> Maybe DOC
+flatten NIL             = return NIL
+flatten (x :<> y)       =
+        do x' <- flatten x
+           y' <- flatten y
+           return (x' :<> y')
+flatten (NEST i x)      =
+        do x' <- flatten x
+           return (NEST i x')
+flatten (TEXT s)        = return (TEXT s)
+flatten LINE            = Nothing               -- abort
+flatten SEP             = return (TEXT " ")     -- SEP is space
+flatten BREAK           = return NIL            -- BREAK is nil
+flatten (x :<|> y)      = flatten x
 
-layout 			:: Doc -> String
-layout Nil		= ""
-layout (Text _ s x)	= s ++ layout x
-layout (Line _ i x)	= '\n' : replicate i ' ' ++ layout x
+layout                  :: Doc -> String
+layout Nil              = ""
+layout (Text _ s x)     = s ++ layout x
+layout (Line _ i x)     = '\n' : replicate i ' ' ++ layout x
 
 best w k doc = be w k [(0,doc)]
 
-be 			:: Int -> Int -> [(Int,DOC)] -> Doc
-be w k []		= Nil
-be w k ((i,NIL):z)	= be w k z
-be w k ((i,x :<> y):z)	= be w k ((i,x):(i,y):z)
+be                      :: Int -> Int -> [(Int,DOC)] -> Doc
+be w k []               = Nil
+be w k ((i,NIL):z)      = be w k z
+be w k ((i,x :<> y):z)  = be w k ((i,x):(i,y):z)
 be w k ((i,NEST j x):z) = be w k ((k+j,x):z)
-be w k ((i,TEXT s):z)	= s `mkText` be w (k+length s) z
-be w k ((i,LINE):z)	= i `mkLine` be w i z
-be w k ((i,SEP):z)	= i `mkLine` be w i z
-be w k ((i,BREAK):z)	= i `mkLine` be w i z
+be w k ((i,TEXT s):z)   = s `mkText` be w (k+length s) z
+be w k ((i,LINE):z)     = i `mkLine` be w i z
+be w k ((i,SEP):z)      = i `mkLine` be w i z
+be w k ((i,BREAK):z)    = i `mkLine` be w i z
 be w k ((i,x :<|> y):z) = better w k
-				(be w k ((i,x):z))
-				(be w k ((i,y):z))
+                                (be w k ((i,x):z))
+                                (be w k ((i,y):z))
 
-better			:: Int -> Int -> Doc -> Doc -> Doc
-better w k x y		= if (w-k) >= toplen x then x else y
+better                  :: Int -> Int -> Doc -> Doc -> Doc
+better w k x y          = if (w-k) >= toplen x then x else y
 
-pretty			:: Int -> DOC -> String
-pretty w x		= layout (best w 0 x)
+pretty                  :: Int -> DOC -> String
+pretty w x              = layout (best w 0 x)
 \end{code}
 
