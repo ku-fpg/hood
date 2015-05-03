@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE CPP, Rank2Types #-}
 \end{code}
 
 The file is part of the Haskell Object Observation Debugger,
@@ -70,6 +70,9 @@ module Debug.Hood.Observe
 \begin{code}
 import System.IO
 import Data.Maybe
+#if !(MIN_VERSION_base(4,8,0))
+import Control.Applicative
+#endif
 import Control.Monad
 import Data.Array as Array
 import Data.List
