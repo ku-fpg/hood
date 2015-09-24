@@ -1,5 +1,5 @@
 \begin{code}
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types, DefaultSignatures, TypeOperators, FlexibleContexts, FlexibleInstances #-}
 \end{code}
 
 The file is part of the Haskell Object Observation Debugger,
@@ -13,6 +13,7 @@ language debuggers.
 
 Copyright (c) Andy Gill, 1992-2000
 Copyright (c) The University of Kansas 2010
+Copyright (c) Maarten Faddegon, 2013-2015
 
 All rights reserved. HOOD is distributed as free software under
 the license in the file "License", which available from the HOOD
@@ -42,6 +43,7 @@ module Debug.Hood.Observe
   , Observer(..)   -- contains a 'forall' typed observe (if supported).
   , Observing      -- a -> a
   , Observable(..) -- Class
+  , Generic
   , runO           -- IO a -> IO ()
   , printO         -- a -> IO ()
   , putStrO        -- String -> IO ()
@@ -80,6 +82,7 @@ import Data.List
 --import IOExts
 import Data.IORef
 import System.IO.Unsafe
+import GHC.Generics
 \end{code}
 
 \begin{code}
@@ -189,7 +192,7 @@ by some compilers, and provide some combinators of various flavors.
 ourCatchAllIO :: IO a -> (Exception.SomeException -> IO a) -> IO a
 ourCatchAllIO = Exception.catch
 
-handleExc :: (Observable a) => Parent -> Exception.SomeException -> IO a
+handleExc :: Parent -> Exception.SomeException -> IO a
 handleExc context exc = return (send "throw" (return throw << exc) context)
 \end{code}
 
@@ -304,6 +307,12 @@ instance Observable Dynamic where { observer = observeOpaque "<Dynamic>" }
 %************************************************************************
 
 \begin{code}
+-- |The 'Observable' class defines how data types are observed.
+-- For 'Generic' data types this can be derived. For example:
+--   @
+--     data MyType = MyConstr Int String deriving Generic
+--     instance Observable MyType
+--   @
 class Observable a where
         {-
          - This reveals the name of a specific constructor.
@@ -317,7 +326,66 @@ class Observable a where
          - This used used to group several observer instances together.
          -}
         observers :: String -> (Observer -> a) -> a
+        default observer :: (Generic a, GObservable (Rep a)) => a -> Parent -> a
+        observer x c = to (gdmobserver (from x) c)
         observers label arg = defaultObservers label arg
+
+class GObservable f where
+        gdmobserver :: f a -> Parent -> f a
+        gdmObserveChildren :: f a -> ObserverM (f a)
+        gdmShallowShow :: f a -> String
+
+-- Meta: data types
+instance (GObservable a) => GObservable (M1 D d a) where
+        gdmobserver m@(M1 x) cxt = M1 (gdmobserver x cxt)
+        gdmObserveChildren = gthunk
+        gdmShallowShow = error "gdmShallowShow not defined on <<Meta: data types>>"
+
+-- Meta: Selectors
+instance (GObservable a, Selector s) => GObservable (M1 S s a) where
+        gdmobserver m@(M1 x) cxt
+          = M1 (gdmobserver x cxt)
+          -- Uncomment next two lines to record selector names
+          -- | selName m == "" = M1 (gdmobserver x cxt)
+          -- | otherwise       = M1 (send (selName m ++ " =") (gdmObserveChildren x) cxt)
+        gdmObserveChildren  = gthunk
+        gdmShallowShow      = error "gdmShallowShow not defined on <<Meta: selectors>>"
+
+-- Meta: Constructors
+instance (GObservable a, Constructor c) => GObservable (M1 C c a) where
+        gdmobserver m1            = send (gdmShallowShow m1) (gdmObserveChildren m1)
+        gdmObserveChildren (M1 x) = do {x' <- gdmObserveChildren x; return (M1 x')}
+        gdmShallowShow            = conName
+
+-- Unit: used for constructors without arguments
+instance GObservable U1 where
+        gdmobserver x _    = x
+        gdmObserveChildren = return
+        gdmShallowShow     = error "gdmShallowShow not defined on <<the unit type>>"
+
+-- Sums: encode choice between constructors
+instance (GObservable a, GObservable b) => GObservable (a :+: b) where
+        gdmobserver (L1 x) = send (gdmShallowShow x) (gdmObserveChildren $ L1 x)
+        gdmobserver (R1 x) = send (gdmShallowShow x) (gdmObserveChildren $ R1 x)
+        gdmShallowShow (L1 x) = gdmShallowShow x
+        gdmShallowShow (R1 x) = gdmShallowShow x
+        gdmObserveChildren (L1 x) = do {x' <- gdmObserveChildren x; return (L1 x')}
+        gdmObserveChildren (R1 x) = do {x' <- gdmObserveChildren x; return (R1 x')}
+
+-- Products: encode multiple arguments to constructors
+instance (GObservable a, GObservable b) => GObservable (a :*: b) where
+        gdmobserver (a :*: b) cxt = (gdmobserver a cxt) :*: (gdmobserver b cxt)
+        gdmObserveChildren (a :*: b) = do a'  <- gdmObserveChildren a
+                                          b'  <- gdmObserveChildren b
+                                          return (a' :*: b')
+        gdmShallowShow = error "gdmShallowShow not defined on <<the product type>>"
+
+-- Constants: additional parameters and recursion of kind *
+instance (Observable a) => GObservable (K1 i a) where
+        gdmobserver (K1 x) cxt = K1 $ observer x cxt
+        gdmObserveChildren = gthunk
+        gdmShallowShow = error "gdmShallowShow not defined on <<constant types>>"
+
 
 type Observing a = a -> a
 \end{code}
@@ -399,6 +467,14 @@ thunk a = ObserverM $ \ parent port ->
                                 })
                 , port+1 )
 
+gthunk :: (GObservable f) => f a -> ObserverM (f a)
+gthunk a = ObserverM $ \ parent port ->
+                ( gdmobserver_ a (Parent
+                                { observeParent = parent
+                                , observePort   = port
+                                }) 
+                , port+1 )
+
 (<<) :: (Observable a) => ObserverM (a -> b) -> a -> ObserverM b
 fn << a = do { fn' <- fn ; a' <- thunk a ; return (fn' a') }
 \end{code}
@@ -437,6 +513,9 @@ observe name a = generateContext name a
 {-# NOINLINE observer_ #-}
 observer_ :: (Observable a) => a -> Parent -> a
 observer_ a context = sendEnterPacket a context
+
+gdmobserver_ :: (GObservable f) => f a -> Parent -> f a
+gdmobserver_ a context = gsendEnterPacket a context
 \end{code}
 
 \begin{code}
@@ -480,6 +559,13 @@ sendEnterPacket :: (Observable a) => a -> Parent -> a
 sendEnterPacket r context = unsafeWithUniq $ \ node ->
      do { sendEvent node context Enter
         ; ourCatchAllIO (evaluate (observer r context))
+                        (handleExc context)
+        }
+
+gsendEnterPacket :: (GObservable f) => f a -> Parent -> f a
+gsendEnterPacket r context = unsafeWithUniq $ \ node ->
+     do { sendEvent node context Enter
+        ; ourCatchAllIO (evaluate (gdmobserver r context))
                         (handleExc context)
         }
 
