@@ -1,5 +1,5 @@
 Name:                hood
-Version:             0.2.2
+Version:             0.2.3
 Synopsis:            Debugging by observing in place
 Description:         Hood debugger, based on the idea of observing functions and structures as they are evaluated.
 Category:            Debug, Trace
@@ -12,11 +12,11 @@ Homepage:            http://www.ittc.ku.edu/csdl/fpg/Hood
 bug-reports:         https://github.com/ku-fpg/hood/issues
 Stability:           alpha
 build-type:          Simple
-Cabal-Version:       >= 1.6
+Cabal-Version:       >= 1.8
 extra-source-files:  CHANGELOG.md, README.md
 
 Library
-  Build-Depends: base >= 4 && < 5, array
+  Build-Depends: base >= 4 && < 5, array, FPretty
   Exposed-modules:
       Debug.Hood.Observe
 

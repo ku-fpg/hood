@@ -83,6 +83,7 @@ import Data.List
 import Data.IORef
 import System.IO.Unsafe
 import GHC.Generics
+import Text.PrettyPrint.FPretty
 \end{code}
 
 \begin{code}
@@ -750,13 +751,13 @@ eventsToCDS pairs = getChild 0 0
         , pport == pport'
         ]
 
-render  :: Int -> Bool -> CDS -> DOC
+render  :: Int -> Bool -> CDS -> Doc
 render prec par (CDSCons _ ":" [cds1,cds2]) =
         if (par && not needParen)
         then doc -- dont use paren (..) because we dont want a grp here!
         else paren needParen doc
    where
-        doc = grp (brk <> renderSet' 5 False cds1 <> text " : ") <>
+        doc = grp (softline <> renderSet' 5 False cds1 <> text " : ") <>
               renderSet' 4 True cds2
         needParen = prec > 4
 render prec par (CDSCons _ "," cdss) | length cdss > 0 =
@@ -767,7 +768,7 @@ render prec par (CDSCons _ name cdss) =
         paren (length cdss > 0 && prec /= 0)
               (nest 2
                  (text name <> foldr (<>) nil
-                                [ sep <> renderSet' 10 False cds
+                                [ softline <> renderSet' 10 False cds
                                 | cds <- cdss
                                 ]
                  )
@@ -776,10 +777,10 @@ render prec par (CDSCons _ name cdss) =
 {- renderSet handles the various styles of CDSSet.
  -}
 
-renderSet :: CDSSet -> DOC
+renderSet :: CDSSet -> Doc
 renderSet = renderSet' 0 False
 
-renderSet' :: Int -> Bool -> CDSSet -> DOC
+renderSet' :: Int -> Bool -> CDSSet -> Doc
 renderSet' _ _      [] = text "_"
 renderSet' prec par [cons@(CDSCons {})]    = render prec par cons
 renderSet' prec par cdss                   =
@@ -795,13 +796,13 @@ renderSet' prec par cdss                   =
         nub (a:a':as) | a == a' = nub (a' : as)
         nub (a:as)              = a : nub as
 
-renderFn :: ([CDSSet],CDSSet) -> DOC
+renderFn :: ([CDSSet],CDSSet) -> Doc
 renderFn (args,res)
         = grp  (nest 3
                 (text "\\ " <>
                  foldr (\ a b -> nest 0 (renderSet' 10 False a) <> sp <> b)
                        nil
-                       args <> sep <>
+                       args <> softline <>
                  text "-> " <> renderSet' 0 False res
                 )
                )
@@ -818,7 +819,7 @@ findFn' other rest = ([],[other]) : rest
 renderTops []   = nil
 renderTops tops = line <> foldr (<>) nil (map renderTop tops)
 
-renderTop :: Output -> DOC
+renderTop :: Output -> Doc
 renderTop (OutLabel str set extras) =
         nest 2 (text ("-- " ++ str) <> line <>
                 renderSet set
@@ -867,11 +868,12 @@ spotString [CDSCons _ ":"
 spotString [CDSCons _ "[]" []] = return []
 spotString other = Nothing
 
-paren :: Bool -> DOC -> DOC
+paren :: Bool -> Doc -> Doc
 paren False doc = grp (nest 0 doc)
-paren True  doc = grp (nest 0 (text "(" <> nest 0 doc <> brk <> text ")"))
+-- paren True  doc = grp (nest 0 (text "(" <> nest 0 doc <> softline <> text ")"))
+paren True  doc = grp (text "(" <> doc <> softline <> text ")")
 
-sp :: DOC
+sp :: Doc
 sp = text " "
 
 data Output = OutLabel String CDSSet [Output]
@@ -895,100 +897,8 @@ cdsToOutput (CDSNamed name cdsset)
       res  = cdssToOutput cdsset
 cdsToOutput cons@(CDSCons {}) = OutData cons
 cdsToOutput    fn@(CDSFun {}) = OutData fn
-\end{code}
 
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{A Pretty Printer}
-%*                                                                      *
-%************************************************************************
-
-This pretty printer is based on Wadler's pretty printer.
-
-\begin{code}
-data DOC                = NIL                   -- nil
-                        | DOC :<> DOC           -- beside
-                        | NEST Int DOC
-                        | TEXT String
-                        | LINE                  -- always "\n"
-                        | SEP                   -- " " or "\n"
-                        | BREAK                 -- ""  or "\n"
-                        | DOC :<|> DOC          -- choose one
-                        deriving (Eq,Show)
-data Doc                = Nil
-                        | Text Int String Doc
-                        | Line Int Int Doc
-                        deriving (Show,Eq)
-
-
-mkText                  :: String -> Doc -> Doc
-mkText s d              = Text (toplen d + length s) s d
-
-mkLine                  :: Int -> Doc -> Doc
-mkLine i d              = Line (toplen d + i) i d
-
-toplen                  :: Doc -> Int
-toplen Nil              = 0
-toplen (Text w s x)     = w
-toplen (Line w s x)     = 0
-
-nil                     = NIL
-x <> y                  = x :<> y
-nest i x                = NEST i x
-text s                  = TEXT s
-line                    = LINE
-sep                     = SEP
-brk                     = BREAK
-
-fold x                  = grp (brk <> x)
-
-grp                     :: DOC -> DOC
-grp x                   =
-        case flatten x of
-          Just x' -> x' :<|> x
-          Nothing -> x
-
-flatten                 :: DOC -> Maybe DOC
-flatten NIL             = return NIL
-flatten (x :<> y)       =
-        do x' <- flatten x
-           y' <- flatten y
-           return (x' :<> y')
-flatten (NEST i x)      =
-        do x' <- flatten x
-           return (NEST i x')
-flatten (TEXT s)        = return (TEXT s)
-flatten LINE            = Nothing               -- abort
-flatten SEP             = return (TEXT " ")     -- SEP is space
-flatten BREAK           = return NIL            -- BREAK is nil
-flatten (x :<|> y)      = flatten x
-
-layout                  :: Doc -> String
-layout Nil              = ""
-layout (Text _ s x)     = s ++ layout x
-layout (Line _ i x)     = '\n' : replicate i ' ' ++ layout x
-
-best w k doc = be w k [(0,doc)]
-
-be                      :: Int -> Int -> [(Int,DOC)] -> Doc
-be w k []               = Nil
-be w k ((i,NIL):z)      = be w k z
-be w k ((i,x :<> y):z)  = be w k ((i,x):(i,y):z)
-be w k ((i,NEST j x):z) = be w k ((k+j,x):z)
-be w k ((i,TEXT s):z)   = s `mkText` be w (k+length s) z
-be w k ((i,LINE):z)     = i `mkLine` be w i z
-be w k ((i,SEP):z)      = i `mkLine` be w i z
-be w k ((i,BREAK):z)    = i `mkLine` be w i z
-be w k ((i,x :<|> y):z) = better w k
-                                (be w k ((i,x):z))
-                                (be w k ((i,y):z))
-
-better                  :: Int -> Int -> Doc -> Doc -> Doc
-better w k x y          = if (w-k) >= toplen x then x else y
-
-pretty                  :: Int -> DOC -> String
-pretty w x              = layout (best w 0 x)
+nil = Text.PrettyPrint.FPretty.empty
+grp = Text.PrettyPrint.FPretty.group
 \end{code}
 
