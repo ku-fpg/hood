@@ -286,8 +286,7 @@ instance Observable Dynamic where { observer = observeOpaque "<Dynamic>" }
 -}
 
 -- | The 'Observable' class defines how data types are observed.
--- For 'Generic' data types, this can be derived on GHC 7.2 or later.
--- For example:
+-- For 'Generic' data types, this can be derived. For example:
 --
 -- @
 --   data MyType = MyConstr Int String deriving 'Generic'
@@ -327,8 +326,8 @@ instance (GObservable a, Selector s) => GObservable (M1 S s a) where
         gdmobserver m@(M1 x) cxt
           = M1 (gdmobserver x cxt)
           -- Uncomment next two lines to record selector names
-          -- | selName m == "" = M1 (gdmobserver x cxt)
-          -- | otherwise       = M1 (send (selName m ++ " =") (gdmObserveChildren x) cxt)
+          -- selName m == "" = M1 (gdmobserver x cxt)
+          -- otherwise       = M1 (send (selName m ++ " =") (gdmObserveChildren x) cxt)
         gdmObserveChildren  = gthunk
         gdmShallowShow      = error "gdmShallowShow not defined on <<Meta: selectors>>"
 
