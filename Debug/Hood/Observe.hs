@@ -1,7 +1,10 @@
-\begin{code}
-{-# LANGUAGE Rank2Types, DefaultSignatures, TypeOperators, FlexibleContexts, FlexibleInstances #-}
-\end{code}
+{-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE TypeOperators #-}
 
+{-
 The file is part of the Haskell Object Observation Debugger,
 (HOOD) March 2010 release.
 
@@ -17,24 +20,24 @@ Copyright (c) Maarten Faddegon, 2013-2015
 
 All rights reserved. HOOD is distributed as free software under
 the license in the file "License", which available from the HOOD
-web page, http://www.haskell.org/hood
+web page, <http://www.haskell.org/hood>
 
 This module produces CDS's, based on the observation made on Haskell
 objects, including base types, constructors and functions.
 
-WARNING: unrestricted use of unsafePerformIO below.
+WARNING: unrestricted use of 'unsafePerformIO' below.
 
-This was ported for the version found on www.haskell.org/hood.
-
-
-%************************************************************************
-%*                                                                      *
-\subsection{Exports}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+This was ported for the version found on <www.haskell.org/hood>.
+-}
 module Debug.Hood.Observe
+
+{-
+************************************************************************
+*                                                                      *
+                                 Exports
+*                                                                      *
+************************************************************************
+-}
   (
    -- * The main Hood API
 
@@ -43,7 +46,6 @@ module Debug.Hood.Observe
   , Observer(..)   -- contains a 'forall' typed observe (if supported).
   , Observing      -- a -> a
   , Observable(..) -- Class
-  , Generic
   , runO           -- IO a -> IO ()
   , printO         -- a -> IO ()
   , putStrO        -- String -> IO ()
@@ -60,16 +62,14 @@ module Debug.Hood.Observe
   , debugO         -- IO a -> IO [CDS]
   , CDS(..)
   ) where
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Imports and infixing}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
+{-
+************************************************************************
+*                                                                      *
+                          Imports and infixing
+*                                                                      *
+************************************************************************
+-}
 import System.IO
 import Data.Maybe
 import Control.Applicative
@@ -83,14 +83,10 @@ import Data.List
 import Data.IORef
 import System.IO.Unsafe
 import GHC.Generics
-import Text.PrettyPrint.FPretty
-\end{code}
+import Text.PrettyPrint.FPretty hiding ((<$>))
 
-\begin{code}
 import Control.Concurrent
-\end{code}
 
-\begin{code}
 import Control.Exception ( Exception, throw )
 import qualified Control.Exception as Exception
 {-
@@ -100,26 +96,21 @@ import qualified Control.Exception as Exception
                 ) as Exception
 -}
 import Data.Dynamic ( Dynamic )
-\end{code}
 
-\begin{code}
 import Prelude
-\end{code}
 
-\begin{code}
 infixl 9 <<
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{External start functions}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                        External start functions
+*                                                                      *
+************************************************************************
 
 Run the observe ridden code.
+-}
 
-\begin{code}
 -- | run some code and return the CDS structure (for when you want to write your own debugger).
 debugO :: IO a -> IO [CDS]
 debugO program =
@@ -175,38 +166,35 @@ runO program =
        ; hPutStrLn stderr ""
        ; hPutStrLn stderr ptyout
        }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Simulations}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                              Simulations
+*                                                                      *
+************************************************************************
 
 Here we provide stubs for the functionally that is not supported
 by some compilers, and provide some combinators of various flavors.
+-}
 
 
-
-\begin{code}
 ourCatchAllIO :: IO a -> (Exception.SomeException -> IO a) -> IO a
 ourCatchAllIO = Exception.catch
 
 handleExc :: Parent -> Exception.SomeException -> IO a
 handleExc context exc = return (send "throw" (return throw << exc) context)
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Instances}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                               Instances
+*                                                                      *
+************************************************************************
 
- The Haskell Base types
+The Haskell Base types
+-}
 
-\begin{code}
 instance Observable Int         where { observer = observeBase }
 instance Observable Bool        where { observer = observeBase }
 instance Observable Integer     where { observer = observeBase }
@@ -226,11 +214,9 @@ observeBase lit cxt = seq lit $ send (show lit) (return lit) cxt
 
 observeOpaque :: String -> a -> Parent -> a
 observeOpaque str val cxt = seq val $ send str (return val) cxt
-\end{code}
 
-The Constructors.
+-- The Constructors.
 
-\begin{code}
 instance (Observable a,Observable b) => Observable (a,b) where
   observer (a,b) = send "," (return (,) << a << b)
 
@@ -256,64 +242,57 @@ instance (Observable a) => Observable (Maybe a) where
 instance (Observable a,Observable b) => Observable (Either a b) where
   observer (Left a)  = send "Left"  (return Left  << a)
   observer (Right a) = send "Right" (return Right << a)
-\end{code}
 
-Arrays.
+-- Arrays.
 
-\begin{code}
 instance (Ix a,Observable a,Observable b) => Observable (Array.Array a b) where
   observer arr = send "array" (return Array.array << Array.bounds arr
                                                   << Array.assocs arr
                               )
-\end{code}
 
-IO monad.
+-- IO monad.
 
-\begin{code}
 instance (Observable a) => Observable (IO a) where
   observer fn cxt =
         do res <- fn
            send "<IO>" (return return << res) cxt
-\end{code}
 
 
-Functions.
+-- Functions.
 
-\begin{code}
 instance (Observable a,Observable b) => Observable (a -> b) where
   observer fn cxt arg = sendObserveFnPacket (
         do arg <- thunk arg
            thunk (fn arg)) cxt
 
   observers = defaultFnObservers
-\end{code}
 
-The Exception *datatype* (not exceptions themselves!).
-For now, we only display IOExceptions and calls to Error.
+-- The Exception *datatype* (not exceptions themselves!).
+-- For now, we only display IOExceptions and calls to Error.
 
-\begin{code}
 instance Observable Exception.SomeException where
 --  observer (IOException a)      = observeOpaque "IOException" (IOException a)
 --  observer (ErrorCall a)        = send "ErrorCall"   (return ErrorCall << a)
   observer other                = send "<Exception>" (return other)
 
 instance Observable Dynamic where { observer = observeOpaque "<Dynamic>" }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Classes and Data Definitions}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                      Classes and Data Definition
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
--- |The 'Observable' class defines how data types are observed.
--- For 'Generic' data types this can be derived. For example:
---   @
---     data MyType = MyConstr Int String deriving Generic
---     instance Observable MyType
---   @
+-- | The 'Observable' class defines how data types are observed.
+-- For 'Generic' data types, this can be derived on GHC 7.2 or later.
+-- For example:
+--
+-- @
+--   data MyType = MyConstr Int String deriving 'Generic'
+--   instance 'Observable' MyType
+-- @
 class Observable a where
         {-
          - This reveals the name of a specific constructor.
@@ -323,12 +302,13 @@ class Observable a where
          - with some of our definitions.
          -}
         observer  :: a -> Parent -> a
+        default observer :: (Generic a, GObservable (Rep a)) => a -> Parent -> a
+        observer x c = to (gdmobserver (from x) c)
+
         {-
          - This used used to group several observer instances together.
          -}
         observers :: String -> (Observer -> a) -> a
-        default observer :: (Generic a, GObservable (Rep a)) => a -> Parent -> a
-        observer x c = to (gdmobserver (from x) c)
         observers label arg = defaultObservers label arg
 
 class GObservable f where
@@ -387,11 +367,26 @@ instance (Observable a) => GObservable (K1 i a) where
         gdmObserveChildren = gthunk
         gdmShallowShow = error "gdmShallowShow not defined on <<constant types>>"
 
+gthunk :: (GObservable f) => f a -> ObserverM (f a)
+gthunk a = ObserverM $ \ parent port ->
+                ( gdmobserver_ a (Parent
+                                { observeParent = parent
+                                , observePort   = port
+                                })
+                , port+1 )
+
+gdmobserver_ :: (GObservable f) => f a -> Parent -> f a
+gdmobserver_ a context = gsendEnterPacket a context
+
+gsendEnterPacket :: (GObservable f) => f a -> Parent -> f a
+gsendEnterPacket r context = unsafeWithUniq $ \ node ->
+     do { sendEvent node context Enter
+        ; ourCatchAllIO (evaluate (gdmobserver r context))
+                        (handleExc context)
+        }
 
 type Observing a = a -> a
-\end{code}
 
-\begin{code}
 newtype Observer = O (forall a . (Observable a) => String -> a -> a)
 
 defaultObservers :: (Observable a) => String -> (Observer -> a) -> a
@@ -431,19 +426,18 @@ defaultFnObservers label fn arg = unsafeWithUniq $ \ node ->
                         , observePort   = 0
                         }) arg)
         }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{The ObserveM Monad}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                          The ObserveM Monad
+*                                                                      *
+************************************************************************
 
 The Observer monad, a simple state monad,
 for placing numbers on sub-observations.
+-}
 
-\begin{code}
 newtype ObserverM a = ObserverM { runMO :: Int -> Int -> (a,Int) }
 
 instance Functor ObserverM where
@@ -468,28 +462,19 @@ thunk a = ObserverM $ \ parent port ->
                                 })
                 , port+1 )
 
-gthunk :: (GObservable f) => f a -> ObserverM (f a)
-gthunk a = ObserverM $ \ parent port ->
-                ( gdmobserver_ a (Parent
-                                { observeParent = parent
-                                , observePort   = port
-                                }) 
-                , port+1 )
-
 (<<) :: (Observable a) => ObserverM (a -> b) -> a -> ObserverM b
 fn << a = do { fn' <- fn ; a' <- thunk a ; return (fn' a') }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{observe and friends}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                          observe and friends
+*                                                                      *
+************************************************************************
 
-Our principle function and class
+Our principal function and class
+-}
 
-\begin{code}
 -- | 'observe' observes data structures in flight.
 --
 -- An example of use is
@@ -515,30 +500,21 @@ observe name a = generateContext name a
 observer_ :: (Observable a) => a -> Parent -> a
 observer_ a context = sendEnterPacket a context
 
-gdmobserver_ :: (GObservable f) => f a -> Parent -> f a
-gdmobserver_ a context = gsendEnterPacket a context
-\end{code}
-
-\begin{code}
 data Parent = Parent
         { observeParent :: !Int -- my parent
         , observePort   :: !Int -- my branch number
         } deriving Show
 root = Parent 0 0
-\end{code}
 
 
-The functions that output the data. All are dirty.
+-- The functions that output the data. All are dirty.
 
-\begin{code}
 unsafeWithUniq :: (Int -> IO a) -> a
 unsafeWithUniq fn
   = unsafePerformIO $ do { node <- getUniq
                          ; fn node
                          }
-\end{code}
 
-\begin{code}
 generateContext :: (Observable a) => String -> a -> a
 generateContext label orig = unsafeWithUniq $ \ node ->
      do { sendEvent node (Parent 0 0) (Observe label)
@@ -563,13 +539,6 @@ sendEnterPacket r context = unsafeWithUniq $ \ node ->
                         (handleExc context)
         }
 
-gsendEnterPacket :: (GObservable f) => f a -> Parent -> f a
-gsendEnterPacket r context = unsafeWithUniq $ \ node ->
-     do { sendEvent node context Enter
-        ; ourCatchAllIO (evaluate (gdmobserver r context))
-                        (handleExc context)
-        }
-
 evaluate :: a -> IO a
 evaluate a = a `seq` return a
 
@@ -580,18 +549,17 @@ sendObserveFnPacket fn context = unsafeWithUniq $ \ node ->
         ; sendEvent node context Fun
         ; return r
         }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Event stream}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                             Event stream
+*                                                                      *
+************************************************************************
 
 Trival output functions
+-}
 
-\begin{code}
 data Event = Event
                 { portId     :: !Int
                 , parent     :: !Parent
@@ -639,18 +607,17 @@ badEvents = error "Bad Event Stream"
 sendSem :: MVar ()
 sendSem = unsafePerformIO $ newMVar ()
 -- end local
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{unique name supply code}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                         Unique name supply code
+*                                                                      *
+************************************************************************
 
 Use the single threaded version
+-}
 
-\begin{code}
 initUniq :: IO ()
 initUniq = writeIORef uniq 1
 
@@ -674,17 +641,15 @@ uniq = unsafePerformIO $ newIORef 1
 {-# NOINLINE uniqSem #-}
 uniqSem :: MVar ()
 uniqSem = unsafePerformIO $ newMVar ()
-\end{code}
 
+{-
+************************************************************************
+*                                                                      *
+                         Global, initualizers, etc
+*                                                                      *
+************************************************************************
+-}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{Global, initualizers, etc}
-%*                                                                      *
-%************************************************************************
-
-\begin{code}
 openObserveGlobal :: IO ()
 openObserveGlobal =
      do { initUniq
@@ -697,16 +662,15 @@ closeObserveGlobal =
         ; putStrLn ""
         ; return evs
         }
-\end{code}
 
-
-%************************************************************************
-%*                                                                      *
-\subsection{The CDS and converting functions}
-%*                                                                      *
-%************************************************************************
+{-
+************************************************************************
+*                                                                      *
+                     The CDS and converting functions
+*                                                                      *
+************************************************************************
+-}
 
-\begin{code}
 data CDS = CDSNamed String         CDSSet
          | CDSCons Int String     [CDSSet]
          | CDSFun  Int             CDSSet CDSSet
@@ -900,5 +864,3 @@ cdsToOutput    fn@(CDSFun {}) = OutData fn
 
 nil = Text.PrettyPrint.FPretty.empty
 grp = Text.PrettyPrint.FPretty.group
-\end{code}
-
