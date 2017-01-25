@@ -61,6 +61,7 @@ module Debug.Hood.Observe
 
   , debugO         -- IO a -> IO [CDS]
   , CDS(..)
+  , CDSSet
   ) where
 
 {-
