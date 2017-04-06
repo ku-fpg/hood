@@ -163,7 +163,7 @@ runO program =
        ; let cdss2 = simplifyCDSSet cdss1
        ; let output1 = cdssToOutput cdss2
        ; let output2 = commonOutput output1
-       ; let ptyout  = pretty 80 (foldr (<>) nil (map renderTop output2))
+       ; let ptyout  = pretty 80 $ foldr ((<>) . renderTop) nil output2
        ; hPutStrLn stderr ""
        ; hPutStrLn stderr ptyout
        }
