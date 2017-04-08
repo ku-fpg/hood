@@ -309,7 +309,7 @@ class Observable a where
          - This used used to group several observer instances together.
          -}
         observers :: String -> (Observer -> a) -> a
-        observers label arg = defaultObservers label arg
+        observers = defaultObservers
 
 class GObservable f where
         gdmobserver :: f a -> Parent -> f a
@@ -376,7 +376,7 @@ gthunk a = ObserverM $ \ parent port ->
                 , port+1 )
 
 gdmobserver_ :: (GObservable f) => f a -> Parent -> f a
-gdmobserver_ a context = gsendEnterPacket a context
+gdmobserver_ = gsendEnterPacket
 
 gsendEnterPacket :: (GObservable f) => f a -> Parent -> f a
 gsendEnterPacket r context = unsafeWithUniq $ \ node ->
@@ -489,7 +489,7 @@ Our principal function and class
 --
 {-# NOINLINE observe #-}
 observe :: (Observable a) => String -> a -> a
-observe name a = generateContext name a
+observe = generateContext
 
 {- This gets called before observer, allowing us to mark
  - we are entering a, before we do case analysis on
@@ -498,7 +498,7 @@ observe name a = generateContext name a
 
 {-# NOINLINE observer_ #-}
 observer_ :: (Observable a) => a -> Parent -> a
-observer_ a context = sendEnterPacket a context
+observer_ = sendEnterPacket
 
 data Parent = Parent
         { observeParent :: !Int -- my parent
@@ -683,7 +683,7 @@ type CDSSet = [CDS]
 eventsToCDS :: [Event] -> CDSSet
 eventsToCDS pairs = getChild 0 0
    where
-     res i = (!) out_arr i
+     res = (!) out_arr
 
      bnds = (0, length pairs)
 
