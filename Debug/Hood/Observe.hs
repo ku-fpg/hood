@@ -781,7 +781,7 @@ findFn' (CDSFun _ arg res) rest =
 findFn' other rest = ([],[other]) : rest
 
 renderTops []   = nil
-renderTops tops = line <> foldr (<>) nil (map renderTop tops)
+renderTops tops = line <> foldr ((<>) . renderTop ) nil tops
 
 renderTop :: Output -> Doc
 renderTop (OutLabel str set extras) =
