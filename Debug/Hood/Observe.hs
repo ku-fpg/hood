@@ -355,7 +355,7 @@ instance (GObservable a, GObservable b) => GObservable (a :+: b) where
 
 -- Products: encode multiple arguments to constructors
 instance (GObservable a, GObservable b) => GObservable (a :*: b) where
-        gdmobserver (a :*: b) cxt = (gdmobserver a cxt) :*: (gdmobserver b cxt)
+        gdmobserver (a :*: b) cxt = gdmobserver a cxt :*: gdmobserver b cxt
         gdmObserveChildren (a :*: b) = do a'  <- gdmObserveChildren a
                                           b'  <- gdmObserveChildren b
                                           return (a' :*: b')
@@ -369,10 +369,10 @@ instance (Observable a) => GObservable (K1 i a) where
 
 gthunk :: (GObservable f) => f a -> ObserverM (f a)
 gthunk a = ObserverM $ \ parent port ->
-                ( gdmobserver_ a (Parent
+                ( gdmobserver_ a Parent
                                 { observeParent = parent
                                 , observePort   = port
-                                })
+                                }
                 , port+1 )
 
 gdmobserver_ :: (GObservable f) => f a -> Parent -> f a
@@ -396,16 +396,16 @@ defaultObservers label fn = unsafeWithUniq $ \ node ->
                = unsafeWithUniq $ \ subnode ->
                  do { sendEvent subnode (Parent node 0)
                                         (Observe sublabel)
-                    ; return (observer_ a (Parent
+                    ; return (observer_ a Parent
                         { observeParent = subnode
                         , observePort   = 0
-                        }))
+                        })
                     }
         ; return (observer_ (fn (O observe'))
-                       (Parent
+                       Parent
                         { observeParent = node
                         , observePort   = 0
-                        }))
+                        })
         }
 defaultFnObservers :: (Observable a, Observable b)
                       => String -> (Observer -> a -> b) -> a -> b
@@ -415,16 +415,16 @@ defaultFnObservers label fn arg = unsafeWithUniq $ \ node ->
                = unsafeWithUniq $ \ subnode ->
                  do { sendEvent subnode (Parent node 0)
                                         (Observe sublabel)
-                    ; return (observer_ a (Parent
+                    ; return (observer_ a Parent
                         { observeParent = subnode
                         , observePort   = 0
-                        }))
+                        })
                     }
         ; return (observer_ (fn (O observe'))
-                       (Parent
+                       Parent
                         { observeParent = node
                         , observePort   = 0
-                        }) arg)
+                        } arg)
         }
 
 {-
@@ -456,10 +456,10 @@ instance Monad ObserverM where
 
 thunk :: (Observable a) => a -> ObserverM a
 thunk a = ObserverM $ \ parent port ->
-                ( observer_ a (Parent
+                ( observer_ a Parent
                                 { observeParent = parent
                                 , observePort   = port
-                                })
+                                }
                 , port+1 )
 
 (<<) :: (Observable a) => ObserverM (a -> b) -> a -> ObserverM b
@@ -518,10 +518,10 @@ unsafeWithUniq fn
 generateContext :: (Observable a) => String -> a -> a
 generateContext label orig = unsafeWithUniq $ \ node ->
      do { sendEvent node (Parent 0 0) (Observe label)
-        ; return (observer_ orig (Parent
+        ; return (observer_ orig Parent
                         { observeParent = node
                         , observePort   = 0
-                        })
+                        }
                   )
         }
 
@@ -717,7 +717,7 @@ eventsToCDS pairs = getChild 0 0
 
 render  :: Int -> Bool -> CDS -> Doc
 render prec par (CDSCons _ ":" [cds1,cds2]) =
-        if (par && not needParen)
+        if par && not needParen
         then doc -- dont use paren (..) because we dont want a grp here!
         else paren needParen doc
    where
