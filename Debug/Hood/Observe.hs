@@ -596,6 +596,7 @@ sendEvent nodeId parent change =
            }
 
 -- local
+{-# NOINLINE events #-}
 events :: IORef [Event]
 events = unsafePerformIO $ newIORef badEvents
 
