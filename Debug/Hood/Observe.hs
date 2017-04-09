@@ -163,7 +163,7 @@ runO program =
        ; let cdss2 = simplifyCDSSet cdss1
        ; let output1 = cdssToOutput cdss2
        ; let output2 = commonOutput output1
-       ; let ptyout  = pretty 80 (foldr (<>) nil (map renderTop output2))
+       ; let ptyout  = pretty 80 $ foldr ((<>) . renderTop) nil output2
        ; hPutStrLn stderr ""
        ; hPutStrLn stderr ptyout
        }
@@ -309,7 +309,7 @@ class Observable a where
          - This used used to group several observer instances together.
          -}
         observers :: String -> (Observer -> a) -> a
-        observers label arg = defaultObservers label arg
+        observers = defaultObservers
 
 class GObservable f where
         gdmobserver :: f a -> Parent -> f a
@@ -355,7 +355,7 @@ instance (GObservable a, GObservable b) => GObservable (a :+: b) where
 
 -- Products: encode multiple arguments to constructors
 instance (GObservable a, GObservable b) => GObservable (a :*: b) where
-        gdmobserver (a :*: b) cxt = (gdmobserver a cxt) :*: (gdmobserver b cxt)
+        gdmobserver (a :*: b) cxt = gdmobserver a cxt :*: gdmobserver b cxt
         gdmObserveChildren (a :*: b) = do a'  <- gdmObserveChildren a
                                           b'  <- gdmObserveChildren b
                                           return (a' :*: b')
@@ -369,14 +369,14 @@ instance (Observable a) => GObservable (K1 i a) where
 
 gthunk :: (GObservable f) => f a -> ObserverM (f a)
 gthunk a = ObserverM $ \ parent port ->
-                ( gdmobserver_ a (Parent
+                ( gdmobserver_ a Parent
                                 { observeParent = parent
                                 , observePort   = port
-                                })
+                                }
                 , port+1 )
 
 gdmobserver_ :: (GObservable f) => f a -> Parent -> f a
-gdmobserver_ a context = gsendEnterPacket a context
+gdmobserver_ = gsendEnterPacket
 
 gsendEnterPacket :: (GObservable f) => f a -> Parent -> f a
 gsendEnterPacket r context = unsafeWithUniq $ \ node ->
@@ -396,16 +396,16 @@ defaultObservers label fn = unsafeWithUniq $ \ node ->
                = unsafeWithUniq $ \ subnode ->
                  do { sendEvent subnode (Parent node 0)
                                         (Observe sublabel)
-                    ; return (observer_ a (Parent
+                    ; return (observer_ a Parent
                         { observeParent = subnode
                         , observePort   = 0
-                        }))
+                        })
                     }
         ; return (observer_ (fn (O observe'))
-                       (Parent
+                       Parent
                         { observeParent = node
                         , observePort   = 0
-                        }))
+                        })
         }
 defaultFnObservers :: (Observable a, Observable b)
                       => String -> (Observer -> a -> b) -> a -> b
@@ -415,16 +415,16 @@ defaultFnObservers label fn arg = unsafeWithUniq $ \ node ->
                = unsafeWithUniq $ \ subnode ->
                  do { sendEvent subnode (Parent node 0)
                                         (Observe sublabel)
-                    ; return (observer_ a (Parent
+                    ; return (observer_ a Parent
                         { observeParent = subnode
                         , observePort   = 0
-                        }))
+                        })
                     }
         ; return (observer_ (fn (O observe'))
-                       (Parent
+                       Parent
                         { observeParent = node
                         , observePort   = 0
-                        }) arg)
+                        } arg)
         }
 
 {-
@@ -456,10 +456,10 @@ instance Monad ObserverM where
 
 thunk :: (Observable a) => a -> ObserverM a
 thunk a = ObserverM $ \ parent port ->
-                ( observer_ a (Parent
+                ( observer_ a Parent
                                 { observeParent = parent
                                 , observePort   = port
-                                })
+                                }
                 , port+1 )
 
 (<<) :: (Observable a) => ObserverM (a -> b) -> a -> ObserverM b
@@ -489,7 +489,7 @@ Our principal function and class
 --
 {-# NOINLINE observe #-}
 observe :: (Observable a) => String -> a -> a
-observe name a = generateContext name a
+observe = generateContext
 
 {- This gets called before observer, allowing us to mark
  - we are entering a, before we do case analysis on
@@ -498,7 +498,7 @@ observe name a = generateContext name a
 
 {-# NOINLINE observer_ #-}
 observer_ :: (Observable a) => a -> Parent -> a
-observer_ a context = sendEnterPacket a context
+observer_ = sendEnterPacket
 
 data Parent = Parent
         { observeParent :: !Int -- my parent
@@ -511,17 +511,19 @@ root = Parent 0 0
 
 unsafeWithUniq :: (Int -> IO a) -> a
 unsafeWithUniq fn
-  = unsafePerformIO $ do { node <- getUniq
-                         ; fn node
+  = unsafePerformIO $ do { node <- readUniq
+                         ; r <- fn node
+                         ; incrementUniq node
+                         ; return r
                          }
 
 generateContext :: (Observable a) => String -> a -> a
 generateContext label orig = unsafeWithUniq $ \ node ->
      do { sendEvent node (Parent 0 0) (Observe label)
-        ; return (observer_ orig (Parent
+        ; return (observer_ orig Parent
                         { observeParent = node
                         , observePort   = 0
-                        })
+                        }
                   )
         }
 
@@ -596,6 +598,7 @@ sendEvent nodeId parent change =
            }
 
 -- local
+{-# NOINLINE events #-}
 events :: IORef [Event]
 events = unsafePerformIO $ newIORef badEvents
 
@@ -621,17 +624,11 @@ Use the single threaded version
 initUniq :: IO ()
 initUniq = writeIORef uniq 1
 
-getUniq :: IO Int
-getUniq
-    = do { takeMVar uniqSem
-         ; n <- readIORef uniq
-         ; writeIORef uniq $! (n + 1)
-         ; putMVar uniqSem ()
-         ; return n
-         }
+incrementUniq :: Int -> IO ()
+incrementUniq n = writeIORef uniq $! (n + 1)
 
-peepUniq :: IO Int
-peepUniq = readIORef uniq
+readUniq :: IO Int
+readUniq = readIORef uniq
 
 -- locals
 {-# NOINLINE uniq #-}
@@ -683,7 +680,7 @@ type CDSSet = [CDS]
 eventsToCDS :: [Event] -> CDSSet
 eventsToCDS pairs = getChild 0 0
    where
-     res i = (!) out_arr i
+     res = (!) out_arr
 
      bnds = (0, length pairs)
 
@@ -717,7 +714,7 @@ eventsToCDS pairs = getChild 0 0
 
 render  :: Int -> Bool -> CDS -> Doc
 render prec par (CDSCons _ ":" [cds1,cds2]) =
-        if (par && not needParen)
+        if par && not needParen
         then doc -- dont use paren (..) because we dont want a grp here!
         else paren needParen doc
    where
@@ -781,7 +778,7 @@ findFn' (CDSFun _ arg res) rest =
 findFn' other rest = ([],[other]) : rest
 
 renderTops []   = nil
-renderTops tops = line <> foldr (<>) nil (map renderTop tops)
+renderTops tops = line <> foldr ((<>) . renderTop ) nil tops
 
 renderTop :: Output -> Doc
 renderTop (OutLabel str set extras) =
