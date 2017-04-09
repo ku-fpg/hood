@@ -511,8 +511,10 @@ root = Parent 0 0
 
 unsafeWithUniq :: (Int -> IO a) -> a
 unsafeWithUniq fn
-  = unsafePerformIO $ do { node <- getUniq
-                         ; fn node
+  = unsafePerformIO $ do { node <- readUniq
+                         ; r <- fn node
+                         ; incrementUniq node
+                         ; return r
                          }
 
 generateContext :: (Observable a) => String -> a -> a
@@ -622,17 +624,11 @@ Use the single threaded version
 initUniq :: IO ()
 initUniq = writeIORef uniq 1
 
-getUniq :: IO Int
-getUniq
-    = do { takeMVar uniqSem
-         ; n <- readIORef uniq
-         ; writeIORef uniq $! (n + 1)
-         ; putMVar uniqSem ()
-         ; return n
-         }
+incrementUniq :: Int -> IO ()
+incrementUniq n = writeIORef uniq $! (n + 1)
 
-peepUniq :: IO Int
-peepUniq = readIORef uniq
+readUniq :: IO Int
+readUniq = readIORef uniq
 
 -- locals
 {-# NOINLINE uniq #-}
