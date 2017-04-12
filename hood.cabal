@@ -30,7 +30,7 @@ Test-Suite hood-test
   Type:                exitcode-stdio-1.0
   Hs-Source-Dirs:      test
   Main-Is:             test.hs
-  Build-Depends:       base, hood
+  Build-Depends:       base, ghc-prim, hood
 
 source-repository head
     type:     git
