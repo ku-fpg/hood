@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -98,7 +99,11 @@ import qualified Control.Exception as Exception
 -}
 import Data.Dynamic ( Dynamic )
 
-import Prelude
+import Prelude hiding (
+#if MIN_VERSION_base(4,11,0)
+                        (<>)
+#endif
+                      )
 
 infixl 9 <<
 

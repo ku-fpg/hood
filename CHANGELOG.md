@@ -1,3 +1,6 @@
+## next [????.??.??]
+* Fix the build on GHC 8.4.
+
 ## 0.3
 * `Observable` instances can be derived for `Generic` instances using
   `DefaultSignatures` ([MaartenFaddegon](https://github.com/ku-fpg/hood/pull/1))
