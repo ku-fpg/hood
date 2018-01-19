@@ -1,5 +1,5 @@
 Name:                hood
-Version:             0.3
+Version:             0.3.1
 Synopsis:            Debugging by observing in place
 Description:         Hood debugger, based on the idea of observing functions and structures as they are evaluated.
 Category:            Debug, Trace
